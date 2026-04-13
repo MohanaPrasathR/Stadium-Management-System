@@ -1,10 +1,13 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useAuth } from '../components/AuthProvider';
+import { TourBookingModal } from '../components/TourBookingModal';
 
 export default function Home() {
   const { user, setShowLoginModal, logout } = useAuth();
+  const [showTourModal, setShowTourModal] = useState(false);
 
   return (
     <div className="min-h-screen">
@@ -59,7 +62,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button 
-              onClick={() => { if(!user) setShowLoginModal(true); else alert('Tour booked successfully! Check your email.'); }}
+              onClick={() => { if(!user) setShowLoginModal(true); else setShowTourModal(true); }}
               className="btn-primary flex items-center justify-center gap-2"
             >
               Book a Tour
@@ -155,6 +158,14 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* Popups */}
+      <TourBookingModal 
+        isOpen={showTourModal} 
+        onClose={() => setShowTourModal(false)}
+        userEmail={user?.email}
+        userName={user?.name}
+      />
     </div>
   );
 }
