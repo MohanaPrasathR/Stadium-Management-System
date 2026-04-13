@@ -49,10 +49,10 @@ export default function EventsPage() {
         )}
       </nav>
 
-      <main className="p-8 md:p-16 max-w-7xl mx-auto">
-        <div className="mb-12">
-          <h1 className="text-5xl font-black mb-4">Upcoming <span className="text-primary italic">Events</span></h1>
-          <p className="text-text-muted text-lg">Explore and book the best experiences at our world-class venues.</p>
+      <main className="p-6 sm:p-12 lg:p-16 max-w-7xl mx-auto">
+        <div className="mb-8 sm:mb-12">
+          <h1 className="text-4xl sm:text-5xl font-black mb-4">Upcoming <span className="text-primary italic">Events</span></h1>
+          <p className="text-text-muted text-base sm:text-lg">Explore and book the best experiences at our world-class venues.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

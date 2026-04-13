@@ -12,7 +12,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 glass px-6 py-4 flex justify-between items-center">
+      <nav className="fixed top-0 w-full z-50 glass px-4 sm:px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <span className="text-dark font-black text-xl">S</span>
@@ -26,12 +26,12 @@ export default function Home() {
           <Link href="#about" className="hover:text-primary transition-colors">About Us</Link>
         </div>
 
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-2 sm:gap-4 items-center">
           {user ? (
             <>
               <span className="text-sm text-text-muted hidden md:inline">Hi, {user.name}</span>
-              <Link href={user.role === 'admin' ? '/admin' : '/user'} className="px-4 py-2 bg-primary text-dark text-sm font-bold rounded-lg hover:bg-primary-hover transition-all">Dashboard</Link>
-              <button onClick={logout} className="px-4 py-2 text-sm font-semibold hover:text-danger transition-colors">Logout</button>
+              <Link href={user.role === 'admin' ? '/admin' : '/user'} className="px-3 sm:px-4 py-2 bg-primary text-dark text-xs sm:text-sm font-bold rounded-lg hover:bg-primary-hover transition-all">Dashboard</Link>
+              <button onClick={logout} className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold hover:text-danger transition-colors">Logout</button>
             </>
           ) : (
             <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 bg-primary text-dark text-sm font-bold rounded-lg hover:bg-primary-hover transition-all">Login</button>
@@ -53,7 +53,7 @@ export default function Home() {
         </div>
 
         <div className="relative z-20 text-center px-4 max-w-5xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black mb-6 leading-tight">
             MANAGE YOUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-cyan-400">STADIUM</span> <br />
             WITH FUTURE TECH
           </h1>

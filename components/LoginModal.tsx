@@ -2,11 +2,14 @@
 import { useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { supabase } from '../lib/supabaseClient';
+import { useRouter } from 'next/navigation';
 
 export function LoginModal() {
+  const router = useRouter();
   const { showLoginModal, setShowLoginModal, login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
   // Form State
   const [email, setEmail] = useState('');
@@ -17,51 +20,66 @@ export function LoginModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    
     setError('');
+    setIsLoading(true);
 
-    if (isLogin) {
-      // Find User in Supabase
-      const { data, error: fetchError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single();
-        
-      if (fetchError || !data) {
-        setError('Account not found.');
+    try {
+      if (isLogin) {
+        // Find User in Supabase
+        const { data, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+          
+        if (fetchError || !data) {
+          setError('Account not found. Please register first.');
+        } else {
+          login({ name: data.name, email: data.email, role: data.role, id: data.id });
+          setShowLoginModal(false);
+          router.push(data.role === 'admin' ? '/admin' : '/user');
+        }
       } else {
-        login({ name: data.name, email: data.email, role: data.role, id: data.id });
-      }
-    } else {
-      // Check if email exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .single();
+        // Check if email exists
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .single();
 
-      if (existingUser) {
-        setError('Email already exists.');
-        return;
-      }
-      
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert([{ name, email, role: 'user' }])
-        .select()
-        .single();
+        if (existingUser) {
+          setError('Email already exists.');
+          setIsLoading(false);
+          return;
+        }
         
-      if (insertError) {
-        setError('Error creating account.');
-      } else {
-        login({ name: newUser.name, email: newUser.email, role: 'user', id: newUser.id });
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{ name, email, role: 'user' }])
+          .select()
+          .single();
+          
+        if (insertError) {
+          setError('Error creating account. Please try again.');
+        } else {
+          login({ name: newUser.name, email: newUser.email, role: 'user', id: newUser.id });
+          setShowLoginModal(false);
+          router.push('/user');
+        }
       }
+    } catch (err) {
+      console.error(err);
+      setError('Connection failed. Please check your data or try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-card border border-card-border p-8 rounded-2xl w-full max-w-md relative shadow-glass">
+      <div className="bg-card border border-card-border p-6 sm:p-8 rounded-2xl w-full max-w-md relative shadow-glass">
         <button 
           onClick={() => setShowLoginModal(false)}
           className="absolute top-4 right-4 text-text-muted hover:text-white"
@@ -117,8 +135,8 @@ export function LoginModal() {
             />
           </div>
 
-          <button type="submit" className="w-full btn-primary py-3 mt-4 text-lg text-center">
-            {isLogin ? 'Login' : 'Register'}
+          <button type="submit" disabled={isLoading} className="w-full btn-primary py-3 mt-4 text-lg text-center disabled:opacity-50">
+            {isLoading ? 'Processing...' : (isLogin ? 'Login' : 'Register')}
           </button>
         </form>
 
