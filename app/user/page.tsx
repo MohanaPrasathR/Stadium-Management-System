@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '../../components/AuthProvider';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Booking {
   id: number;
@@ -12,14 +14,31 @@ interface Booking {
 }
 
 export default function UserDashboard() {
+  const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
-    setBookings([
-      { id: 1, user_name: 'John Doe', event_name: 'Champions League Final', seat_number: 'A-42', status: 'Confirmed' },
-      { id: 2, user_name: 'John Doe', event_name: 'World Music Festival', seat_number: 'VIP-12', status: 'Pending' }
-    ]);
-  }, []);
+    async function loadBookings() {
+      if (!user) return;
+      const { data } = await supabase
+        .from('bookings')
+        .select('id, guests, status, events(name)')
+        .eq('user_id', (user as any).id);
+
+      if (data && data.length > 0) {
+        setBookings(data.map((b: any) => ({
+          id: b.id,
+          user_name: user.name,
+          event_name: b.events?.name || 'Unknown Event',
+          seat_number: `${b.guests || 1} Slot(s)`,
+          status: b.status || 'Confirmed'
+        } as Booking)));
+      } else {
+        setBookings([]);
+      }
+    }
+    loadBookings();
+  }, [user]);
 
   const stats = [
     { label: 'Active Tickets', value: bookings.filter(b => b.status === 'Confirmed').length, color: 'text-primary' },
@@ -31,7 +50,7 @@ export default function UserDashboard() {
     <div className="space-y-10">
       {/* Welcome Header */}
       <section>
-        <h1 className="text-4xl font-black mb-2">Welcome back, <span className="text-primary italic">John Doe</span></h1>
+        <h1 className="text-4xl font-black mb-2">Welcome back, <span className="text-primary italic">{user?.name || 'Guest'}</span></h1>
         <p className="text-text-muted">You have {bookings.filter(b => b.status === 'Confirmed').length} upcoming events this week.</p>
       </section>
 
