@@ -27,9 +27,8 @@ export function LoginModal() {
         .eq('email', email)
         .single();
         
-      if (fetchError || !data || data.password !== password) {
-        // Note: For production, password should be hashed, skipping for demo format.
-        setError('Invalid email or password.');
+      if (fetchError || !data) {
+        setError('Account not found.');
       } else {
         login({ name: data.name, email: data.email, role: data.role, id: data.id });
       }
@@ -48,7 +47,7 @@ export function LoginModal() {
       
       const { data: newUser, error: insertError } = await supabase
         .from('users')
-        .insert([{ name, email, role: 'user', password }]) // Note: storing password plaintext just for demo!
+        .insert([{ name, email, role: 'user' }])
         .select()
         .single();
         

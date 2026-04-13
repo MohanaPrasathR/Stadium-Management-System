@@ -20,9 +20,9 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-dark flex">
+    <div className="min-h-screen bg-dark flex flex-col md:flex-row">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-white/5 bg-card/50 backdrop-blur-xl hidden lg:flex flex-col">
+      <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-white/5 bg-card/50 backdrop-blur-xl flex flex-col">
         <div className="p-8">
           <div className="flex items-center gap-2 mb-10">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
