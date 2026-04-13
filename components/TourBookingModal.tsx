@@ -7,9 +7,10 @@ interface TourBookingModalProps {
   onClose: () => void;
   userEmail?: string;
   userName?: string;
+  userId?: string;
 }
 
-export function TourBookingModal({ isOpen, onClose, userEmail, userName }: TourBookingModalProps) {
+export function TourBookingModal({ isOpen, onClose, userEmail, userName, userId }: TourBookingModalProps) {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [guests, setGuests] = useState('1');
