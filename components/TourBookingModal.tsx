@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 interface TourBookingModalProps {
   isOpen: boolean;
@@ -16,10 +17,25 @@ export function TourBookingModal({ isOpen, onClose, userEmail, userName }: TourB
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (date && time && guests) {
-      // Simulate API Booking Call
+    if (date && time && guests && userId) {
+      
+      // We will book a special generic "Stadium Tour" event or create it
+      // For simplicity, we just insert into bookings using the first available event ID or null
+      // Find a generic event or use event_id if we create a pseudo "Tour Event"
+      // Since it's a "Tour", we can just store it in bookings with a default or first event ID for now
+      const { data: firstEvent } = await supabase.from('events').select('id').limit(1).single();
+      
+      if (firstEvent) {
+        await supabase.from('bookings').insert([{
+           user_id: userId,
+           event_id: firstEvent.id,
+           guests: parseInt(guests),
+           status: 'Pending'
+        }]);
+      }
+
       setIsSuccess(true);
       setTimeout(() => {
         setIsSuccess(false);

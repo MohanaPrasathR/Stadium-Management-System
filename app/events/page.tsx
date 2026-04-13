@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../components/AuthProvider';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Event {
   id: number;
@@ -17,12 +18,19 @@ export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
-    setEvents([
-      { id: 1, name: 'Champions League Final', date: 'MAY 24', description: 'The biggest match of the year between the giants of Europe.', capacity: 85000 },
-      { id: 2, name: 'World Music Festival', date: 'JUN 15', description: 'A weekend of incredible live performances by top artists.', capacity: 55000 },
-      { id: 3, name: 'Tech Conf 2026', date: 'JUL 10', description: 'Annual technology conference featuring keynote speakers and tech demos.', capacity: 15000 },
-      { id: 4, name: 'Basketball Showdown', date: 'AUG 05', description: 'National championship finals.', capacity: 20000 }
-    ]);
+    async function loadEvents() {
+      const { data } = await supabase.from('events').select('*');
+      if (data && data.length > 0) {
+        setEvents(data);
+      } else {
+        // Fallback for visual demo if DB is empty / no keys
+        setEvents([
+          { id: 1, name: 'Champions League Final', date: 'MAY 24', description: 'The biggest match of the year between the giants of Europe.', capacity: 85000 },
+          { id: 2, name: 'World Music Festival', date: 'JUN 15', description: 'A weekend of incredible live performances by top artists.', capacity: 55000 }
+        ] as any);
+      }
+    }
+    loadEvents();
   }, []);
 
   return (
@@ -77,11 +85,16 @@ export default function EventsPage() {
                       {event.capacity} Slots
                     </div>
                     <button 
-                      onClick={() => {
+                      onClick={async () => {
                         if (!user) {
                           setShowLoginModal(true);
                         } else {
-                          alert(`Successfully booked ticket for ${event.name}! Check your dashboard.`);
+                          const { error } = await supabase
+                            .from('bookings')
+                            .insert([{ user_id: (user as any).id, event_id: event.id, guests: 1 }]);
+                          
+                          if (error) alert("Booking failed");
+                          else alert(`Successfully booked ticket for ${event.name}! Check your dashboard.`);
                         }
                       }}
                       className="px-6 py-2 bg-primary text-dark font-bold rounded-lg hover:bg-primary-hover transition-all"

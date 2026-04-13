@@ -165,6 +165,7 @@ export default function Home() {
         onClose={() => setShowTourModal(false)}
         userEmail={user?.email}
         userName={user?.name}
+        userId={(user as any)?.id}
       />
     </div>
   );

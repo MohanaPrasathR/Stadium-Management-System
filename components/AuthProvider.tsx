@@ -26,21 +26,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     setMounted(true);
-    
-    // Check for logged in session
     const storedSession = localStorage.getItem('stadium_auth_session');
     if (storedSession) {
       setUser(JSON.parse(storedSession));
-    }
-
-    // Initialize mock database if empty
-    const dbUsers = localStorage.getItem('stadium_users_db');
-    if (!dbUsers) {
-      const initialUsers = [
-        { name: 'Admin User', email: 'admin@stadiumhub.com', password: 'password123', role: 'admin' },
-        { name: 'John Doe', email: 'user@stadiumhub.com', password: 'password123', role: 'user' }
-      ];
-      localStorage.setItem('stadium_users_db', JSON.stringify(initialUsers));
     }
   }, []);
 

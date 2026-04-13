@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from './AuthProvider';
+import { supabase } from '../lib/supabaseClient';
 
 export function LoginModal() {
   const { showLoginModal, setShowLoginModal, login } = useAuth();
@@ -14,32 +15,48 @@ export function LoginModal() {
 
   if (!showLoginModal) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const dbUsersRaw = localStorage.getItem('stadium_users_db') || '[]';
-    const dbUsers = JSON.parse(dbUsersRaw);
-
     if (isLogin) {
-      // Find User
-      const user = dbUsers.find((u: any) => u.email === email && u.password === password);
-      if (user) {
-        login({ name: user.name, email: user.email, role: user.role });
-      } else {
+      // Find User in Supabase
+      const { data, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+        
+      if (fetchError || !data || data.password !== password) {
+        // Note: For production, password should be hashed, skipping for demo format.
         setError('Invalid email or password.');
+      } else {
+        login({ name: data.name, email: data.email, role: data.role, id: data.id });
       }
     } else {
-      // Register logic
-      if (dbUsers.find((u: any) => u.email === email)) {
+      // Check if email exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (existingUser) {
         setError('Email already exists.');
         return;
       }
       
-      const newUser = { name, email, password, role: 'user' };
-      dbUsers.push(newUser);
-      localStorage.setItem('stadium_users_db', JSON.stringify(dbUsers));
-      login({ name, email, role: 'user' });
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert([{ name, email, role: 'user', password }]) // Note: storing password plaintext just for demo!
+        .select()
+        .single();
+        
+      if (insertError) {
+        setError('Error creating account.');
+      } else {
+        login({ name: newUser.name, email: newUser.email, role: 'user', id: newUser.id });
+      }
     }
   };
 
