@@ -1,10 +1,47 @@
 'use client';
+import { useState } from 'react';
 import { useAuth } from './AuthProvider';
 
 export function LoginModal() {
   const { showLoginModal, setShowLoginModal, login } = useAuth();
+  const [isLogin, setIsLogin] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Form State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
 
   if (!showLoginModal) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const dbUsersRaw = localStorage.getItem('stadium_users_db') || '[]';
+    const dbUsers = JSON.parse(dbUsersRaw);
+
+    if (isLogin) {
+      // Find User
+      const user = dbUsers.find((u: any) => u.email === email && u.password === password);
+      if (user) {
+        login({ name: user.name, email: user.email, role: user.role });
+      } else {
+        setError('Invalid email or password.');
+      }
+    } else {
+      // Register logic
+      if (dbUsers.find((u: any) => u.email === email)) {
+        setError('Email already exists.');
+        return;
+      }
+      
+      const newUser = { name, email, password, role: 'user' };
+      dbUsers.push(newUser);
+      localStorage.setItem('stadium_users_db', JSON.stringify(dbUsers));
+      login({ name, email, role: 'user' });
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -17,30 +54,76 @@ export function LoginModal() {
              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-        <h2 className="text-3xl font-black mb-2">Login Required</h2>
-        <p className="text-text-muted mb-8 text-sm">Please select your account type to access this feature.</p>
         
-        <div className="flex flex-col gap-4">
-          <button 
-            onClick={() => login('user')}
-            className="w-full btn-primary py-4 text-lg text-center"
-          >
-            Login as Guest / User
-          </button>
-          
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-white/10"></div>
-            <span className="flex-shrink-0 mx-4 text-text-muted text-xs font-bold uppercase">or</span>
-            <div className="flex-grow border-t border-white/10"></div>
+        <h2 className="text-3xl font-black mb-2">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+        <p className="text-text-muted mb-8 text-sm">
+          {isLogin ? 'Enter your credentials to access your account.' : 'Join to start booking stadium events.'}
+        </p>
+
+        {error && <div className="p-3 mb-6 bg-red-500/10 border border-red-500/30 text-red-500 text-sm rounded-lg font-bold">{error}</div>}
+        
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {!isLogin && (
+            <div>
+              <label className="text-xs font-bold text-text-muted uppercase tracking-wider">Full Name</label>
+              <input 
+                type="text" 
+                className="input-field w-full mt-1" 
+                placeholder="John Doe" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required={!isLogin}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-bold text-text-muted uppercase tracking-wider">Email Address</label>
+            <input 
+              type="email" 
+              className="input-field w-full mt-1" 
+              placeholder="user@stadiumhub.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
 
+          <div>
+            <label className="text-xs font-bold text-text-muted uppercase tracking-wider">Password</label>
+            <input 
+              type="password" 
+              className="input-field w-full mt-1" 
+              placeholder="••••••••" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <button type="submit" className="w-full btn-primary py-3 mt-4 text-lg text-center">
+            {isLogin ? 'Login' : 'Register'}
+          </button>
+        </form>
+
+        <div className="mt-8 text-center text-sm text-text-muted">
+          {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button 
-            onClick={() => login('admin')}
-            className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold py-4 rounded-xl transition-all text-center"
+            type="button"
+            onClick={() => { setIsLogin(!isLogin); setError(''); }}
+            className="text-primary font-bold hover:underline"
           >
-            Login as Admin
+            {isLogin ? 'Sign up' : 'Log in'}
           </button>
         </div>
+
+        {/* Demo Accounts Notice */}
+        <div className="mt-8 pt-4 border-t border-white/5 text-xs text-text-muted">
+          <div className="font-bold mb-1">Demo Accounts:</div>
+          <div>Admin: admin@stadiumhub.com / password123</div>
+          <div>User: user@stadiumhub.com / password123</div>
+        </div>
+
       </div>
     </div>
   );
