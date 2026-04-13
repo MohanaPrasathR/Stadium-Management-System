@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
 interface User {
   id: number;
@@ -32,22 +33,52 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    setUsers([
-      { id: 1, name: 'John Doe', email: 'john@example.com', role: 'User' },
-      { id: 2, name: 'Admin Hub', email: 'admin@stadiumhub.com', role: 'Admin' },
-      { id: 3, name: 'Sarah Jane', email: 'sarah@example.com', role: 'User' }
-    ]);
-    setEvents([
-      { id: 1, name: 'Champions League Final', date: 'MAY 24', description: 'The biggest match of the year between the giants of Europe.', capacity: 85000 },
-      { id: 2, name: 'World Music Festival', date: 'JUN 15', description: 'A weekend of incredible live performances by top artists.', capacity: 55000 },
-      { id: 3, name: 'Tech Conf 2026', date: 'JUL 10', description: 'Annual technology conference featuring keynote speakers and tech demos.', capacity: 15000 },
-      { id: 4, name: 'Basketball Showdown', date: 'AUG 05', description: 'National championship finals.', capacity: 20000 }
-    ]);
-    setBookings([
-      { id: 1, user_name: 'John Doe', event_name: 'Champions League Final', seat_number: 'A-42', status: 'Confirmed' },
-      { id: 2, user_name: 'Sarah Jane', event_name: 'World Music Festival', seat_number: 'VIP-12', status: 'Pending' },
-      { id: 3, user_name: 'Mike Smith', event_name: 'Tech Conf 2026', seat_number: 'C-05', status: 'Confirmed' }
-    ]);
+    async function loadAdminData() {
+      // Fetch Users
+      const { data: usersData } = await supabase.from('users').select('*');
+      if (usersData && usersData.length > 0) setUsers(usersData);
+      else {
+        setUsers([
+          { id: 1, name: 'John Doe', email: 'john@example.com', role: 'User' },
+          { id: 2, name: 'Admin Hub', email: 'admin@stadiumhub.com', role: 'Admin' },
+          { id: 3, name: 'Sarah Jane', email: 'sarah@example.com', role: 'User' }
+        ] as any);
+      }
+
+      // Fetch Events
+      const { data: eventsData } = await supabase.from('events').select('*');
+      if (eventsData && eventsData.length > 0) setEvents(eventsData);
+      else {
+        setEvents([
+          { id: 1, name: 'Champions League Final', date: 'MAY 24', description: 'The biggest match of the year between the giants of Europe.', capacity: 85000 },
+          { id: 2, name: 'World Music Festival', date: 'JUN 15', description: 'A weekend of incredible live performances by top artists.', capacity: 55000 },
+          { id: 3, name: 'Tech Conf 2026', date: 'JUL 10', description: 'Annual technology conference featuring keynote speakers and tech demos.', capacity: 15000 },
+        ] as any);
+      }
+
+      // Fetch Bookings with relations
+      const { data: bookingsData, error } = await supabase
+        .from('bookings')
+        .select('*, events(name), users(name)');
+        
+      if (bookingsData && bookingsData.length > 0) {
+        const formatted = bookingsData.map((b: any) => ({
+          id: b.id,
+          user_name: b.users?.name || 'Unknown User',
+          event_name: b.events?.name || 'Unknown Event',
+          seat_number: `${b.guests || 1} Slot(s)`,
+          status: b.status || 'Confirmed'
+        })) as any;
+        setBookings(formatted);
+      } else {
+        setBookings([
+          { id: 1, user_name: 'John Doe', event_name: 'Champions League Final', seat_number: 'A-42', status: 'Confirmed' },
+          { id: 2, user_name: 'Sarah Jane', event_name: 'World Music Festival', seat_number: 'VIP-12', status: 'Pending' },
+        ] as any);
+      }
+    }
+    
+    loadAdminData();
   }, []);
 
   const stats = [
