@@ -1,10 +1,25 @@
+'use client';
 import Link from 'next/link';
+import { useAuth } from '../components/AuthProvider';
 
 export default function UserLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user, setShowLoginModal } = useAuth();
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4 text-center">
+        <h1 className="text-4xl font-black text-primary mb-4">Login Required</h1>
+        <p className="text-text-muted mb-8">You need to log in to access your dashboard and tickets.</p>
+        <button onClick={() => setShowLoginModal(true)} className="btn-primary mb-4">Click to Login</button>
+        <Link href="/" className="text-text-muted hover:text-white underline">Return Home</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-dark">
       {/* Top Nav */}
@@ -23,7 +38,7 @@ export default function UserLayout({
             <Link href="/bookings" className="hover:text-primary transition-colors">My Tickets</Link>
           </div>
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-dark font-bold text-xs cursor-pointer">
-            JD
+            {user.name.substring(0, 2).toUpperCase()}
           </div>
         </div>
       </nav>

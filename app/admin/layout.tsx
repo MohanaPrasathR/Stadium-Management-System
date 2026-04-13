@@ -1,8 +1,24 @@
+'use client';
+import { useAuth } from '../components/AuthProvider';
+import Link from 'next/link';
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useAuth();
+  
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4 text-center">
+        <h1 className="text-4xl font-black text-danger mb-4">Access Denied</h1>
+        <p className="text-text-muted mb-8">You must be logged in as an administrator to view this page.</p>
+        <Link href="/" className="btn-primary">Return Home</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-dark flex">
       {/* Sidebar */}

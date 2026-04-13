@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '../components/AuthProvider';
 
 interface Event {
   id: number;
@@ -12,6 +13,7 @@ interface Event {
 }
 
 export default function EventsPage() {
+  const { user, setShowLoginModal } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
@@ -32,7 +34,11 @@ export default function EventsPage() {
           </div>
           <span className="font-bold tracking-tight">STADIUM<span className="text-primary italic">HUB</span></span>
         </Link>
-        <Link href="/user" className="text-primary font-bold hover:underline">Go to Dashboard →</Link>
+        {user ? (
+          <Link href={user.role === 'admin' ? '/admin' : '/user'} className="text-primary font-bold hover:underline">Go to Dashboard →</Link>
+        ) : (
+          <button onClick={() => setShowLoginModal(true)} className="text-primary font-bold hover:underline">Login to Dashboard →</button>
+        )}
       </nav>
 
       <main className="p-8 md:p-16 max-w-7xl mx-auto">
@@ -70,7 +76,16 @@ export default function EventsPage() {
                       <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                       {event.capacity} Slots
                     </div>
-                    <button className="px-6 py-2 bg-primary text-dark font-bold rounded-lg hover:bg-primary-hover transition-all">
+                    <button 
+                      onClick={() => {
+                        if (!user) {
+                          setShowLoginModal(true);
+                        } else {
+                          alert(`Successfully booked ticket for ${event.name}! Check your dashboard.`);
+                        }
+                      }}
+                      className="px-6 py-2 bg-primary text-dark font-bold rounded-lg hover:bg-primary-hover transition-all"
+                    >
                       Book Now
                     </button>
                   </div>

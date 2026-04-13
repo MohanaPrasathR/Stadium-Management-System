@@ -1,7 +1,11 @@
+'use client';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useAuth } from '../components/AuthProvider';
 
 export default function Home() {
+  const { user, setShowLoginModal, logout } = useAuth();
+
   return (
     <div className="min-h-screen">
       {/* Navigation */}
@@ -19,9 +23,16 @@ export default function Home() {
           <Link href="#about" className="hover:text-primary transition-colors">About Us</Link>
         </div>
 
-        <div className="flex gap-4">
-          <Link href="/user" className="px-4 py-2 text-sm font-semibold hover:text-primary transition-colors">User Login</Link>
-          <Link href="/admin" className="px-4 py-2 bg-primary text-dark text-sm font-bold rounded-lg hover:bg-primary-hover transition-all">Admin Panel</Link>
+        <div className="flex gap-4 items-center">
+          {user ? (
+            <>
+              <span className="text-sm text-text-muted hidden md:inline">Hi, {user.name}</span>
+              <Link href={user.role === 'admin' ? '/admin' : '/user'} className="px-4 py-2 bg-primary text-dark text-sm font-bold rounded-lg hover:bg-primary-hover transition-all">Dashboard</Link>
+              <button onClick={logout} className="px-4 py-2 text-sm font-semibold hover:text-danger transition-colors">Logout</button>
+            </>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 bg-primary text-dark text-sm font-bold rounded-lg hover:bg-primary-hover transition-all">Login</button>
+          )}
         </div>
       </nav>
 
@@ -47,15 +58,18 @@ export default function Home() {
             Experience the most advanced stadium management platform. Real-time tracking, seamless bookings, and intelligent event scheduling.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="btn-primary flex items-center justify-center gap-2">
+            <button 
+              onClick={() => { if(!user) setShowLoginModal(true); else alert('Tour booked successfully! Check your email.'); }}
+              className="btn-primary flex items-center justify-center gap-2"
+            >
               Book a Tour
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
-            <button className="px-8 py-3 rounded-xl border border-white/20 hover:bg-white/10 transition-all font-semibold">
+            <Link href="/events" className="px-8 py-3 rounded-xl border border-white/20 hover:bg-white/10 transition-all font-semibold inline-block">
               Explore Events
-            </button>
+            </Link>
           </div>
         </div>
       </section>
