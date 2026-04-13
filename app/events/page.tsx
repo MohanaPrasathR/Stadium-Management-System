@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '../components/AuthProvider';
+import { useAuth } from '../../components/AuthProvider';
 
 interface Event {
   id: number;

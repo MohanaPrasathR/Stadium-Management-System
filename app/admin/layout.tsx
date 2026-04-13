@@ -1,5 +1,5 @@
 'use client';
-import { useAuth } from '../components/AuthProvider';
+import { useAuth } from '../../components/AuthProvider';
 import Link from 'next/link';
 
 export default function AdminLayout({
