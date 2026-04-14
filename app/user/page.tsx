@@ -6,7 +6,7 @@ import { useAuth } from '../../components/AuthProvider';
 import { supabase } from '../../lib/supabaseClient';
 
 interface Booking {
-  id: number;
+  id: string;
   user_name: string;
   event_name: string;
   seat_number: string;

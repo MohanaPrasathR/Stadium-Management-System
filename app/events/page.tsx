@@ -6,7 +6,7 @@ import { useAuth } from '../../components/AuthProvider';
 import { supabase } from '../../lib/supabaseClient';
 
 interface Event {
-  id: number;
+  id: string;
   name: string;
   date: string;
   description: string;

@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: string;
 }
 
 interface Event {
-  id: number;
+  id: string;
   name: string;
   date: string;
   description: string;
@@ -19,7 +19,7 @@ interface Event {
 }
 
 interface Booking {
-  id: number;
+  id: string;
   user_name: string;
   event_name: string;
   seat_number: string;
