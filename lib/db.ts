@@ -23,7 +23,14 @@ if (!fs.existsSync(SIM_DB_PATH)) {
     ],
     bookings: [],
     messages: [],
-    events: [{ id: 1, name: 'Stadium Tour' }]
+    events: [
+      { id: 1, name: 'Stadium Tour', date: 'APR 25', description: 'A complete guided tour of the stadium facilities including pitch, locker rooms, and VIP boxes.', capacity: 5000 },
+      { id: 2, name: 'Champions League Final', date: 'MAY 24', description: 'The biggest club football match of the year between the giants of Europe.', capacity: 85000 },
+      { id: 3, name: 'World Music Festival', date: 'JUN 15', description: 'A weekend of incredible live performances by the world\'s top artists.', capacity: 55000 },
+      { id: 4, name: 'Athletics World Championship', date: 'JUL 10', description: 'Watch elite athletes compete for gold at the premier track and field event.', capacity: 70000 },
+      { id: 5, name: 'International Cricket T20', date: 'AUG 03', description: 'High-octane T20 cricket action between rival national teams.', capacity: 45000 },
+      { id: 6, name: 'Formula E Night Race', date: 'SEP 20', description: 'Electrifying electric racing under the stadium lights.', capacity: 30000 }
+    ]
   }, null, 2));
 }
 
@@ -52,14 +59,17 @@ export async function query(sql: string, values?: any[]) {
     const data = getSimData();
     const upperSql = sql.toUpperCase();
     
-    if (upperSql.includes('SELECT * FROM USERS')) {
+    if (upperSql.includes('FROM USERS')) {
       if (values?.[0]) return data.users.filter((u: any) => u.email === values[0]);
       return data.users;
     }
-    if (upperSql.includes('SELECT * FROM MESSAGES') || upperSql.includes('FROM MESSAGES')) {
+    if (upperSql.includes('FROM MESSAGES')) {
        return data.messages;
     }
-    if (upperSql.includes('SELECT B.*') || upperSql.includes('FROM BOOKINGS')) {
+    if (upperSql.includes('FROM EVENTS')) {
+      return data.events;
+    }
+    if (upperSql.includes('FROM BOOKINGS') || upperSql.includes('SELECT B.*')) {
       if (values?.[0]) return data.bookings.filter((b: any) => b.user_id == values[0]);
       return data.bookings;
     }
