@@ -1,121 +1,56 @@
-# Stadium Management System
+# ArenaPass 🏟️
 
-A full-fledged stadium management system built with Next.js, TypeScript, Tailwind CSS, and MySQL.
+**Stadium event ticketing and guided-tour booking.** Next.js 16 (App Router), TypeScript, Tailwind CSS and MySQL.
+Formerly *Stadium Management System*.
 
 ## Features
 
-- User management (registration, login)
-- Event management (create, view events)
-- Seat booking system
-- Admin dashboard for managing users, events, and bookings
-- Responsive web interface
+- **Accounts:** register and log in with bcrypt-hashed passwords, signed HttpOnly session cookies,
+  login rate limiting, and roles checked on the server (fan / admin).
+- **Events:** browse upcoming events with prices, and book 1-6 tickets. Capacity is enforced in a
+  database transaction with the event row locked, so two buyers can't both take the last seats.
+- **Stadium tours:** pick a date (up to 60 days ahead) and a start time. Each time slot has its own
+  capacity.
+- **Fan dashboard:** upcoming and past bookings with reference codes, and self-service cancellation
+  that releases the seats.
+- **Admin dashboard:** revenue, tickets sold, all bookings, users (never their password hashes) and
+  event creation. Everything is protected by server checks, not just hidden in the UI.
+- **Two data backends:** MySQL when `DB_HOST` is set, otherwise a seeded in-memory demo store that
+  works on read-only hosts like Vercel. Database errors are reported, never silently redirected to a
+  different store.
 
-## Tech Stack
+## Security fixes in this version
 
-- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
-- **Backend:** Next.js API Routes
-- **Database:** MySQL
-- **Styling:** Tailwind CSS
+The earlier version was a front-end prototype. This release replaces its shortcuts:
 
-## Getting Started
+| Before | Now |
+| --- | --- |
+| Plain-text passwords in the DB and JSON file | bcrypt hashes; admin created from env vars by `npm run setup-db` |
+| "Session" = `{role}` in localStorage, editable in DevTools | HMAC-signed HttpOnly cookie, role re-read from the DB on every request |
+| Any email containing `stadiumhub.com` logged in when the API failed | Removed; only real credentials work |
+| Simulated "Continue with Google" that logged everyone into one account | Removed |
+| APIs trusted `user_id` from the request body; anyone could read all bookings | Owner comes from the session; users only see their own bookings |
+| No capacity or duplicate checks; failed bookings shown as successful | Transactional capacity checks; real errors shown to the user |
+| Admin page read Supabase tables from the browser; hardcoded revenue figures | Admin-only APIs with live figures |
+| MySQL errors silently fell back to writing a JSON file | Explicit backend choice; errors are logged and reported |
 
-### Prerequisites
-
-- Node.js 18+
-- MySQL database
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Set up your MySQL database and update the environment variables in `.env.local`:
-   ```
-   DB_HOST=localhost
-   DB_USER=your_username
-   DB_PASSWORD=your_password
-   DB_NAME=stadium_management
-   ```
-
-4. Create the database tables (see database schema below)
-
-5. Run the development server:
-   ```bash
-   npm run dev
-   ```
-
-6. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Database Schema
-
-### Users Table
-```sql
-CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'user') DEFAULT 'user'
-);
-```
-
-### Events Table
-```sql
-CREATE TABLE events (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  date DATETIME NOT NULL,
-  description TEXT,
-  capacity INT NOT NULL
-);
-```
-
-### Bookings Table
-```sql
-CREATE TABLE bookings (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  event_id INT NOT NULL,
-  seat_number VARCHAR(10) NOT NULL,
-  status ENUM('confirmed', 'cancelled') DEFAULT 'confirmed',
-  FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (event_id) REFERENCES events(id)
-);
-```
-
-## API Endpoints
-
-- `GET /api/users` - Get all users
-- `POST /api/users` - Create a new user
-- `GET /api/events` - Get all events
-- `POST /api/events` - Create a new event
-- `GET /api/bookings` - Get all bookings
-- `POST /api/bookings` - Create a new booking
-
-## Pages
-
-- `/` - Home page with navigation
-- `/user` - User dashboard
-- `/admin` - Admin panel
-- `/events` - Browse events
-
-## Building for Production
+## Run it
 
 ```bash
-npm run build
-npm start
+npm install
+npm run dev                  # in-memory demo: fan@arenapass.demo / admin@arenapass.demo, password Arena@2026
 ```
 
-## Contributing
+With MySQL:
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+```bash
+cp .env.example .env.local   # fill in DB_* and SESSION_SECRET
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-long-password' npm run setup-db
+npm run dev
+```
 
-## License
+## Tests
 
-This project is licensed under the MIT License.
+```bash
+npm test     # session forgery, validation, capacity per event and per tour slot, cancellation, stats
+```
