@@ -1,188 +1,127 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../components/AuthProvider';
-import { supabase } from '../../lib/supabaseClient';
 
 interface Booking {
-  id: string;
-  user_name: string;
+  id: number;
+  reference: string;
   event_name: string;
-  seat_number: string;
-  status: string;
+  event_date: string;
+  quantity: number;
+  tour_slot: string | null;
+  status: 'confirmed' | 'cancelled';
+  total_price: number;
 }
+
+const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
+const when = (b: Booking) => {
+  const iso = b.tour_slot ? b.tour_slot.slice(0, 10) : b.event_date;
+  const date = new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  return b.tour_slot ? `${date} · ${b.tour_slot.slice(11)}` : date;
+};
+const isPast = (b: Booking) => new Date(`${b.tour_slot ? b.tour_slot.slice(0, 10) : b.event_date}T23:59:59`) < new Date();
 
 export default function UserDashboard() {
   const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    async function loadBookings() {
-      if (!user) return;
-      try {
-        const response = await fetch(`/api/bookings?user_id=${(user as any).id}`);
-        const data = await response.json();
-
-        if (Array.isArray(data)) {
-          setBookings(data.map((b: any) => ({
-            id: b.id,
-            user_name: user.name,
-            event_name: b.event_name || 'Stadium Tour',
-            seat_number: b.seat_number || `${b.guests || 1} Slot(s)`,
-            status: b.status || 'Confirmed'
-          } as Booking)));
-        }
-      } catch (err) {
-        console.warn("Failed to fetch bookings from API:", err);
-        setBookings([]);
-      }
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/bookings');
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not load your bookings.');
+      setBookings(await res.json());
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load your bookings.');
+    } finally {
+      setLoading(false);
     }
-    loadBookings();
-  }, [user]);
+  }, []);
 
+  useEffect(() => { load(); }, [load]);
+
+  const cancel = async (b: Booking) => {
+    if (!window.confirm(`Cancel ${b.quantity} ticket(s) for ${b.event_name}?`)) return;
+    const res = await fetch(`/api/bookings/${b.id}`, { method: 'DELETE' });
+    if (!res.ok) setError((await res.json().catch(() => ({}))).error || 'Could not cancel the booking.');
+    load();
+  };
+
+  const upcoming = bookings.filter((b) => b.status === 'confirmed' && !isPast(b));
   const stats = [
-    { label: 'Active Tickets', value: bookings.filter(b => b.status === 'Confirmed').length, color: 'text-primary' },
-    { label: 'Pending', value: bookings.filter(b => b.status === 'Pending').length, color: 'text-yellow-400' },
-    { label: 'Past Events', value: 3, color: 'text-text-muted' },
+    { label: 'Upcoming bookings', value: upcoming.length, color: 'text-primary' },
+    { label: 'Tickets held', value: upcoming.reduce((s, b) => s + b.quantity, 0), color: 'text-white' },
+    { label: 'Past or cancelled', value: bookings.length - upcoming.length, color: 'text-text-muted' },
   ];
 
   return (
     <div className="space-y-10">
-      {/* Welcome Header */}
       <section>
-        <h1 className="text-4xl font-black mb-2">Welcome back, <span className="text-primary italic">{user?.name || 'Guest'}</span></h1>
-        <p className="text-text-muted">You have {bookings.filter(b => b.status === 'Confirmed').length} upcoming events this week.</p>
+        <h1 className="text-4xl font-black mb-2">Welcome back, <span className="text-primary italic">{user?.name}</span></h1>
+        <p className="text-text-muted">
+          {upcoming.length ? `You have ${upcoming.length} upcoming booking${upcoming.length > 1 ? 's' : ''}.` : 'No upcoming bookings yet.'}
+        </p>
       </section>
 
-      {/* Stats Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {stats.map((stat, i) => (
-          <div key={i} className="card relative overflow-hidden group">
+        {stats.map((stat) => (
+          <div key={stat.label} className="card">
             <div className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">{stat.label}</div>
-            <div className={`text-5xl font-black ${stat.color} transition-transform group-hover:scale-110`}>{stat.value}</div>
-            <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-white/5 rounded-full blur-2xl" />
+            <div className={`text-5xl font-black ${stat.color}`}>{stat.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* My Bookings Section */}
-        <div className="lg:col-span-2 space-y-12">
-          <div className="space-y-6">
-            <div className="flex justify-between items-end">
-              <h2 className="text-2xl font-bold">Your Bookings</h2>
-              <Link href="/bookings" className="text-primary text-sm font-bold hover:underline">See All</Link>
-            </div>
-
-            <div className="space-y-4">
-              {bookings.length === 0 ? (
-                <div className="card text-center py-20 bg-card/20 border-dashed border-2">
-                  <div className="text-text-muted mb-4 italic">No active bookings found</div>
-                  <Link href="/events" className="btn-primary inline-block">Browse Events</Link>
-                </div>
-              ) : (
-                bookings.map((booking) => (
-                  <div key={booking.id} className="card flex flex-col md:flex-row gap-6 items-center group">
-                    <div className="w-full md:w-32 h-20 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shrink-0">
-                      <svg className="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 text-center md:text-left">
-                      <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{booking.event_name}</h3>
-                      <div className="text-text-muted text-sm mt-1">
-                        Seat: <span className="text-white font-bold">{booking.seat_number}</span> • Gate 4 • Section B
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center md:items-end gap-2">
-                      <span className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
-                        booking.status === 'Confirmed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-primary/10 text-primary border border-primary/20'
-                      }`}>
-                        {booking.status}
-                      </span>
-                      <button className="text-sm font-bold hover:text-primary transition-colors underline underline-offset-4">Download PDF</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Message Center / Email Log */}
-          <div className="space-y-6">
-            <div className="flex justify-between items-end">
-              <h2 className="text-2xl font-bold">Message Center</h2>
-              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded font-bold">New Notifications</span>
-            </div>
-            
-            <div className="card bg-dark/40 border-white/5 space-y-4">
-              <div className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center w-full mb-1">
-                    <h4 className="font-bold text-sm">Booking Confirmed: Stadium Tour</h4>
-                    <span className="text-[10px] text-text-muted italic">Just Now</span>
-                  </div>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Hello {user?.name}, your stadium tour is confirmed. Check your email for the detailed itinerary and gate pass.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 p-4 rounded-xl opacity-50">
-                <div className="w-10 h-10 rounded-full bg-white/10 text-text-muted flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm">Ticket Verification Success</h4>
-                  <p className="text-xs text-text-muted">Your identity has been verified by the stadium security system.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+      <section className="space-y-6">
+        <div className="flex justify-between items-end">
+          <h2 className="text-2xl font-bold">Your bookings</h2>
+          <Link href="/events" className="text-primary text-sm font-bold hover:underline">Browse events</Link>
         </div>
 
-        {/* Sidebar: Recommended */}
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold">Trending Now</h2>
-          <div className="card space-y-6">
-            {[
-              { name: 'Champions League Final', cate: 'Sports', img: '⚽' },
-              { name: 'World Music Festival', cate: 'Concert', img: '🎵' },
-              { name: 'Red Bull Racing Expo', cate: 'Exhibit', img: '🏎️' },
-            ].map((item, i) => (
-              <div key={i} className="flex gap-4 group cursor-pointer">
-                <div className="w-12 h-12 flex items-center justify-center text-3xl bg-dark rounded-xl border border-white/5 transition-transform group-hover:scale-110">
-                  {item.img}
+        {error && <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl font-bold">{error}</div>}
+
+        {loading ? (
+          <div className="card text-center py-16 text-text-muted">Loading your bookings…</div>
+        ) : bookings.length === 0 ? (
+          <div className="card text-center py-20 bg-card/20 border-dashed border-2">
+            <div className="text-text-muted mb-4 italic">You haven&apos;t booked anything yet</div>
+            <Link href="/events" className="btn-primary inline-block">Browse Events</Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {bookings.map((b) => (
+              <div key={b.id} className={`card flex flex-col md:flex-row gap-6 items-center ${b.status === 'cancelled' || isPast(b) ? 'opacity-60' : ''}`}>
+                <div className="w-full md:w-32 h-20 bg-primary/10 rounded-xl flex flex-col items-center justify-center border border-primary/20 shrink-0">
+                  <span className="text-xs text-text-muted uppercase tracking-wider">Ref</span>
+                  <span className="font-black text-primary text-sm">{b.reference}</span>
                 </div>
-                <div>
-                  <div className="font-bold group-hover:text-primary transition-colors">{item.name}</div>
-                  <div className="text-xs text-text-muted font-bold uppercase tracking-wider">{item.cate}</div>
+                <div className="flex-1 text-center md:text-left">
+                  <h3 className="text-xl font-bold">{b.event_name}</h3>
+                  <div className="text-text-muted text-sm mt-1">
+                    {when(b)} · <span className="text-white font-bold">{b.quantity} ticket{b.quantity > 1 ? 's' : ''}</span> · {inr(b.total_price)}
+                  </div>
+                </div>
+                <div className="flex flex-col items-center md:items-end gap-2">
+                  <span className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+                    b.status === 'confirmed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  }`}>
+                    {b.status === 'confirmed' && isPast(b) ? 'attended' : b.status}
+                  </span>
+                  {b.status === 'confirmed' && !isPast(b) && (
+                    <button onClick={() => cancel(b)} className="text-sm font-bold hover:text-danger transition-colors underline underline-offset-4">
+                      Cancel booking
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
-            <button className="w-full py-3 border border-white/5 rounded-xl text-sm font-bold hover:bg-white/5 transition-colors mt-4">
-              Explore Discover
-            </button>
           </div>
-
-          <div className="card bg-gradient-to-br from-primary/20 to-cyan-500/10 border-primary/30 relative overflow-hidden group">
-             <div className="relative z-10">
-               <h3 className="text-lg font-black mb-2 italic">UPGRADE TO VIP</h3>
-               <p className="text-xs text-text-muted mb-4">Get exclusive access to private boxes and meet-and-greet sessions.</p>
-               <button className="text-xs font-bold px-4 py-2 bg-primary text-dark rounded-lg hover:bg-primary-hover">Learn More</button>
-             </div>
-             <div className="absolute -bottom-8 -right-8 text-8xl opacity-10 blur-sm group-hover:scale-125 transition-transform">💎</div>
-          </div>
-        </div>
-      </div>
+        )}
+      </section>
     </div>
   );
 }
