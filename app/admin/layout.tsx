@@ -7,8 +7,12 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   
+  if (loading) {
+    return <div className="min-h-screen bg-dark flex items-center justify-center text-text-muted">Loading…</div>;
+  }
+
   if (!user || user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4 text-center">
@@ -26,7 +30,7 @@ export default function AdminLayout({
         <div className="p-8">
           <div className="flex items-center gap-2 mb-10">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-dark font-black text-sm">S</span>
+              <span className="text-dark font-black text-sm">A</span>
             </div>
             <span className="font-bold tracking-tight">ADMIN<span className="text-primary italic">HUB</span></span>
           </div>
@@ -52,11 +56,11 @@ export default function AdminLayout({
         <div className="mt-auto p-6 border-t border-white/5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold">
-              AD
+              {user.name.substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <div className="text-sm font-bold">Admin User</div>
-              <div className="text-xs text-text-muted">admin@stadiumhub.com</div>
+              <div className="text-sm font-bold">{user.name}</div>
+              <div className="text-xs text-text-muted">{user.email}</div>
             </div>
           </div>
         </div>

@@ -17,7 +17,7 @@ export default function Home() {
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <span className="text-dark font-black text-xl">S</span>
           </div>
-          <span className="text-xl font-bold tracking-tight">STADIUM<span className="text-primary italic">HUB</span></span>
+          <span className="text-xl font-bold tracking-tight">ARENA<span className="text-primary italic">PASS</span></span>
         </div>
         
         <div className="hidden md:flex gap-8 items-center text-sm font-medium">
@@ -146,11 +146,11 @@ export default function Home() {
         <div className="max-w-7xl mx-auto flex flex-col md:row justify-between items-center gap-8">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-dark font-black text-sm">S</span>
+              <span className="text-dark font-black text-sm">A</span>
             </div>
             <span className="font-bold tracking-tight">STADIUMHUB</span>
           </div>
-          <p className="text-text-muted text-sm text-center">© 2026 StadiumHub Management. All rights reserved.</p>
+          <p className="text-text-muted text-sm text-center">© 2026 ArenaPass. All rights reserved.</p>
           <div className="flex gap-6">
             <Link href="#" className="hover:text-primary transition-colors">Privacy</Link>
             <Link href="#" className="hover:text-primary transition-colors">Terms</Link>
@@ -164,8 +164,6 @@ export default function Home() {
         isOpen={showTourModal} 
         onClose={() => setShowTourModal(false)}
         userEmail={user?.email}
-        userName={user?.name}
-        userId={(user as any)?.id}
       />
     </div>
   );

@@ -1,53 +1,57 @@
 'use client';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-type User = { id?: string; name: string; email: string; role: 'user' | 'admin' } | null;
+export type User = { id: number; name: string; email: string; role: 'user' | 'admin' } | null;
 
 interface AuthContextType {
   user: User;
+  loading: boolean;
+  demo: boolean;
   login: (user: User) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   showLoginModal: boolean;
   setShowLoginModal: (show: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  loading: true,
+  demo: false,
   login: () => {},
-  logout: () => {},
+  logout: async () => {},
   showLoginModal: false,
   setShowLoginModal: () => {},
 });
 
+/**
+ * The session lives in an HttpOnly cookie that JavaScript can't read or forge.
+ * On load we ask the server who we are; nothing about the user is stored in localStorage.
+ */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User>(null);
+  const [loading, setLoading] = useState(true);
+  const [demo, setDemo] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const storedSession = localStorage.getItem('stadium_auth_session');
-    if (storedSession) {
-      setUser(JSON.parse(storedSession));
-    }
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((d) => { setUser(d.user); setDemo(!!d.demo); })
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+    if (new URLSearchParams(window.location.search).get('login') === '1') setShowLoginModal(true);
   }, []);
 
-  const login = (newUser: User) => {
-    setUser(newUser);
-    localStorage.setItem('stadium_auth_session', JSON.stringify(newUser));
-    setShowLoginModal(false);
-  };
+  const login = useCallback((u: User) => { setUser(u); setShowLoginModal(false); }, []);
 
-  const logout = () => {
+  const logout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setUser(null);
-    localStorage.removeItem('stadium_auth_session');
     window.location.href = '/';
-  };
-
-  if (!mounted) return <>{children}</>;
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, showLoginModal, setShowLoginModal }}>
+    <AuthContext.Provider value={{ user, loading, demo, login, logout, showLoginModal, setShowLoginModal }}>
       {children}
     </AuthContext.Provider>
   );

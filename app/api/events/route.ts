@@ -1,24 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { query, execute } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { body, handler, json, requireAdmin } from '@/lib/http';
+import { store } from '@/lib/store';
+import { int, isoDate, str } from '@/lib/validate';
 
-export async function GET() {
-  try {
-    const events = await query('SELECT * FROM events');
-    return NextResponse.json(events);
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
-  }
-}
+export const GET = handler(async () => json(await store().listEvents()));
 
-export async function POST(request: NextRequest) {
-  try {
-    const { name, date, description, capacity } = await request.json();
-    const [result] = await execute(
-      'INSERT INTO events (name, date, description, capacity) VALUES (?, ?, ?, ?)',
-      [name, date, description, capacity]
-    );
-    return NextResponse.json({ id: (result as any).insertId, message: 'Event created' }, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
-  }
-}
+export const POST = handler(async (req: NextRequest) => {
+  await requireAdmin(req);
+  const b = await body(req);
+  const event = await store().createEvent({
+    name: str(b.name, 'Name', 3, 120),
+    date: isoDate(b.date),
+    description: str(b.description ?? '', 'Description', 0, 1000),
+    capacity: int(b.capacity, 'Capacity', 1, 200000),
+    price: int(b.price, 'Price', 0, 100000),
+    is_tour: b.is_tour === true,
+  });
+  return json(event, 201);
+});

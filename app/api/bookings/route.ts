@@ -1,41 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { query, execute } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { body, handler, HttpError, json, rateLimit, requireUser } from '@/lib/http';
+import { CapacityError, store } from '@/lib/store';
+import { int, tourSlot } from '@/lib/validate';
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('user_id');
+const MAX_TICKETS_PER_BOOKING = 6;
 
-    let sql = `
-      SELECT b.*, u.name as user_name, e.name as event_name
-      FROM bookings b
-      JOIN users u ON b.user_id = u.id
-      JOIN events e ON b.event_id = e.id
-    `;
-    let values: any[] = [];
+/** Users see their own bookings; admins can pass ?scope=all to see everyone's. */
+export const GET = handler(async (req: NextRequest) => {
+  const user = await requireUser(req);
+  const all = user.role === 'admin' && req.nextUrl.searchParams.get('scope') === 'all';
+  return json(await store().listBookings(all ? {} : { userId: user.id }));
+});
 
-    if (userId) {
-      sql += ' WHERE b.user_id = ?';
-      values.push(userId);
-    }
+export const POST = handler(async (req: NextRequest) => {
+  const user = await requireUser(req);          // the booking owner comes from the session, never the request body
+  rateLimit(`book:${user.id}`, 20, 60 * 60 * 1000);
+  const b = await body(req);
+  const event = await store().getEvent(int(b.event_id, 'Event', 1, 1e9));
+  if (!event) throw new HttpError(404, 'Event not found.');
+  const quantity = int(b.quantity ?? 1, 'Tickets', 1, MAX_TICKETS_PER_BOOKING);
 
-    const bookings = await query(sql, values);
-    return NextResponse.json(bookings);
-  } catch (error) {
-    console.error('Fetch bookings error:', error);
-    return NextResponse.json({ error: 'Failed to fetch bookings' }, { status: 500 });
+  let slot: string | null = null;
+  if (event.is_tour) {
+    slot = tourSlot(b.tour_date, b.tour_time);
+  } else if (new Date(`${event.date}T23:59:59`).getTime() < Date.now()) {
+    throw new HttpError(400, 'This event has already taken place.');
   }
-}
-
-export async function POST(request: NextRequest) {
   try {
-    const { user_id, event_id, seat_number } = await request.json();
-    const [result] = await execute(
-      'INSERT INTO bookings (user_id, event_id, seat_number, status) VALUES (?, ?, ?, ?)',
-      [user_id, event_id, seat_number, 'confirmed']
+    const booking = await store().createBooking(
+      { user_id: user.id, event_id: event.id, quantity, tour_slot: slot, total_price: event.price * quantity },
+      event.capacity,
     );
-    return NextResponse.json({ id: (result as any).insertId, message: 'Booking created' }, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to create booking' }, { status: 500 });
+    console.info(`[mail] booking ${booking.reference} confirmed for ${user.email}`); // hook for a real mailer
+    return json(booking, 201);
+  } catch (e) {
+    if (e instanceof CapacityError) throw new HttpError(409, e.message);
+    throw e;
   }
-}
+});

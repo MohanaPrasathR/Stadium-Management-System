@@ -1,79 +1,68 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface TourBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   userEmail?: string;
-  userName?: string;
-  userId?: string;
 }
 
-export function TourBookingModal({ isOpen, onClose, userEmail, userName, userId }: TourBookingModalProps) {
+interface TourEvent { id: number; price: number; capacity: number; is_tour: boolean }
+
+const TOUR_TIMES = ['10:00', '11:30', '13:00', '14:30', '16:00'];
+const MAX_GUESTS = 6;
+const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
+
+export function TourBookingModal({ isOpen, onClose, userEmail }: TourBookingModalProps) {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [guests, setGuests] = useState('1');
-  const [isSuccess, setIsSuccess] = useState(false);
-  // ✅ FIXED: useState hook MUST be before any early return
+  const [tour, setTour] = useState<TourEvent | null>(null);
+  const [reference, setReference] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (!isOpen || tour) return;
+    fetch('/api/events')
+      .then((r) => r.json())
+      .then((events: TourEvent[]) => setTour(events.find((e) => e.is_tour) ?? null))
+      .catch(() => setError('Could not load tour details. Please try again.'));
+  }, [isOpen, tour]);
+
   if (!isOpen) return null;
+  const isSuccess = !!reference;
+  const guestCount = Math.min(MAX_GUESTS, Math.max(1, parseInt(guests) || 1));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tour) return;
     setError('');
     setIsLoading(true);
-
     try {
-      // Use userId if available, otherwise use a demo placeholder
-      const effectiveUserId = userId || 'demo-user';
-
-      // 1. Create Booking
-      const bookingRes = await fetch('/api/bookings', {
+      const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: effectiveUserId,
-          event_id: 1,
-          seat_number: `${guests} Guest(s) — ${time}`,
-        }),
+        body: JSON.stringify({ event_id: tour.id, quantity: guestCount, tour_date: date, tour_time: time }),
       });
-
-      // 2. Send Email Notification (fire-and-forget)
-      fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: userEmail || 'guest@stadiumhub.com',
-          subject: 'Booking Confirmed: Stadium Tour',
-          body: `Hello ${userName || 'Guest'},\n\nYour stadium tour is confirmed for ${date} at ${time}.\nGuests: ${guests}\n\nWe look forward to seeing you!\n\nBest regards,\nStadiumHub Team`,
-          type: 'booking_confirmation'
-        }),
-      }).catch(() => {}); // Don't block on mail failure
-
-      if (!bookingRes.ok) {
-        const errData = await bookingRes.json().catch(() => ({}));
-        console.warn('Booking API error:', errData);
-        // Still show success for presentation — the fallback db handles it
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Booking failed. Please try again.');
+      setReference(data.reference);
     } catch (err) {
-      console.warn('Booking request failed, proceeding with success state anyway:', err);
+      setError(err instanceof Error ? err.message : 'Booking failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsSuccess(false);
-      onClose();
-    }, 5000);
   };
+
+  const close = () => { setReference(''); setError(''); onClose(); };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-card border border-card-border p-8 rounded-2xl w-full max-w-md relative shadow-glass">
         <button
-          onClick={onClose}
+          onClick={close}
+          aria-label="Close"
           className="absolute top-4 right-4 text-text-muted hover:text-white"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,12 +82,8 @@ export function TourBookingModal({ isOpen, onClose, userEmail, userName, userId 
               <strong className="text-white">{time}</strong>.
               <br />
               <br />
-              <span className="flex items-center justify-center gap-2 text-green-400 font-bold mt-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Confirmation email sent to {userEmail || 'your inbox'}
-              </span>
+              Booking reference <strong className="text-primary">{reference}</strong>
+              {userEmail && <span className="block mt-2">We&apos;ll send the confirmation to {userEmail}.</span>}
             </p>
           </div>
         ) : (
@@ -121,6 +106,7 @@ export function TourBookingModal({ isOpen, onClose, userEmail, userName, userId 
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
+                  max={new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]}
                   required
                 />
               </div>
@@ -135,9 +121,7 @@ export function TourBookingModal({ isOpen, onClose, userEmail, userName, userId 
                     required
                   >
                     <option value="" disabled>Select Time</option>
-                    <option value="10:00 AM">10:00 AM</option>
-                    <option value="1:00 PM">1:00 PM</option>
-                    <option value="3:30 PM">3:30 PM</option>
+                    {TOUR_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
@@ -146,7 +130,7 @@ export function TourBookingModal({ isOpen, onClose, userEmail, userName, userId 
                     type="number"
                     className="input-field w-full mt-1"
                     min="1"
-                    max="10"
+                    max={MAX_GUESTS}
                     value={guests}
                     onChange={(e) => setGuests(e.target.value)}
                     required
@@ -156,12 +140,12 @@ export function TourBookingModal({ isOpen, onClose, userEmail, userName, userId 
 
               <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl mt-2 flex justify-between items-center text-sm font-bold">
                 <span className="text-primary tracking-wide">Total Price:</span>
-                <span className="font-black text-xl">${parseInt(guests) * 25 || 25}</span>
+                <span className="font-black text-xl">{tour ? inr(tour.price * guestCount) : '…'}</span>
               </div>
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !tour}
                 className="w-full btn-primary py-4 mt-2 text-lg text-center font-black tracking-wide disabled:opacity-50"
               >
                 {isLoading ? (

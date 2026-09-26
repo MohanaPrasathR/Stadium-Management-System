@@ -1,196 +1,165 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-interface Event {
-  id: string;
-  name: string;
-  date: string;
-  description: string;
-  capacity: number;
-}
-
+interface User { id: number; name: string; email: string; role: string; created_at: string }
+interface Event { id: number; name: string; date: string; description: string; capacity: number; price: number; is_tour: boolean }
 interface Booking {
-  id: string;
-  user_name: string;
-  event_name: string;
-  seat_number: string;
-  status: string;
+  id: number; reference: string; user_name: string; event_name: string; quantity: number;
+  tour_slot: string | null; status: string; total_price: number; created_at: string;
+}
+interface Stats { users: number; events: number; bookings: number; activeBookings: number; ticketsSold: number; revenue: number }
+
+const inr = (n: number) => '₹' + n.toLocaleString('en-IN');
+const fmtDate = (iso: string) => new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data as T;
 }
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({ name: '', date: '', capacity: '1000', price: '500', description: '' });
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    async function loadAdminData() {
-      // Fetch Users
-      const { data: usersData } = await supabase.from('users').select('*');
-      if (usersData && usersData.length > 0) setUsers(usersData);
-      else {
-        setUsers([
-          { id: 1, name: 'John Doe', email: 'john@example.com', role: 'User' },
-          { id: 2, name: 'Admin Hub', email: 'admin@stadiumhub.com', role: 'Admin' },
-          { id: 3, name: 'Sarah Jane', email: 'sarah@example.com', role: 'User' }
-        ] as any);
-      }
+  const load = () =>
+    Promise.all([
+      getJson<Stats>('/api/admin/stats'),
+      getJson<User[]>('/api/admin/users'),
+      getJson<Event[]>('/api/events'),
+      getJson<Booking[]>('/api/bookings?scope=all'),
+    ])
+      .then(([s, u, e, b]) => { setStats(s); setUsers(u); setEvents(e); setBookings(b); setError(''); })
+      .catch((e: Error) => setError(e.message));
 
-      // Fetch Events
-      const { data: eventsData } = await supabase.from('events').select('*');
-      if (eventsData && eventsData.length > 0) setEvents(eventsData);
-      else {
-        setEvents([
-          { id: 1, name: 'Champions League Final', date: 'MAY 24', description: 'The biggest match of the year between the giants of Europe.', capacity: 85000 },
-          { id: 2, name: 'World Music Festival', date: 'JUN 15', description: 'A weekend of incredible live performances by top artists.', capacity: 55000 },
-          { id: 3, name: 'Tech Conf 2026', date: 'JUL 10', description: 'Annual technology conference featuring keynote speakers and tech demos.', capacity: 15000 },
-        ] as any);
-      }
+  useEffect(() => { load(); }, []);
 
-      // Fetch Bookings with relations
-      const { data: bookingsData, error } = await supabase
-        .from('bookings')
-        .select('*, events(name), users(name)');
-        
-      if (bookingsData && bookingsData.length > 0) {
-        const formatted = bookingsData.map((b: any) => ({
-          id: b.id,
-          user_name: b.users?.name || 'Unknown User',
-          event_name: b.events?.name || 'Unknown Event',
-          seat_number: `${b.guests || 1} Slot(s)`,
-          status: b.status || 'Confirmed'
-        })) as any;
-        setBookings(formatted);
-      } else {
-        setBookings([
-          { id: 1, user_name: 'John Doe', event_name: 'Champions League Final', seat_number: 'A-42', status: 'Confirmed' },
-          { id: 2, user_name: 'Sarah Jane', event_name: 'World Music Festival', seat_number: 'VIP-12', status: 'Pending' },
-        ] as any);
-      }
+  const createEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, capacity: Number(form.capacity), price: Number(form.price) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not create the event.');
+      setForm({ name: '', date: '', capacity: '1000', price: '500', description: '' });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the event.');
+    } finally {
+      setSaving(false);
     }
-    
-    loadAdminData();
-  }, []);
+  };
 
-  const stats = [
-    { label: 'Total Revenue', value: '$124,500', trend: '+12.5%', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-    { label: 'Total Bookings', value: '1,280', trend: '+5.2%', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
-    { label: 'Active Events', value: '24', trend: '0%', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    { label: 'Total Users', value: users.length.toString(), trend: '+2.1%', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
-  ];
+  const tiles = stats ? [
+    { label: 'Revenue (confirmed)', value: inr(stats.revenue) },
+    { label: 'Tickets sold', value: stats.ticketsSold.toLocaleString('en-IN') },
+    { label: 'Active bookings', value: `${stats.activeBookings} / ${stats.bookings}` },
+    { label: 'Registered users', value: stats.users.toString() },
+  ] : [];
 
   return (
     <div className="space-y-8">
-      {/* Stats Grid */}
+      {error && <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl font-bold">{error}</div>}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, i) => (
-          <div key={i} className="card relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={stat.icon} />
-              </svg>
-            </div>
-            <div className="text-text-muted text-sm font-medium mb-1">{stat.label}</div>
-            <div className="text-3xl font-black mb-2">{stat.value}</div>
-            <div className={`text-xs font-bold ${stat.trend.startsWith('+') ? 'text-green-400' : 'text-text-muted'}`}>
-              {stat.trend} <span className="text-text-muted ml-1 font-normal text-opacity-50">vs last month</span>
-            </div>
+        {tiles.map((t) => (
+          <div key={t.label} className="card">
+            <div className="text-text-muted text-sm font-medium mb-1">{t.label}</div>
+            <div className="text-3xl font-black">{t.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Main Content Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Bookings Table */}
         <div className="lg:col-span-2 card">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold">Recent Bookings</h3>
-            <button className="text-primary text-sm font-bold hover:underline">View All</button>
-          </div>
+          <h3 className="text-xl font-bold mb-6">Recent bookings</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-white/5 text-text-muted text-sm">
-                  <th className="pb-4 font-medium">User</th>
+                  <th className="pb-4 font-medium">Ref</th>
+                  <th className="pb-4 font-medium">Customer</th>
                   <th className="pb-4 font-medium">Event</th>
-                  <th className="pb-4 font-medium">Seat</th>
+                  <th className="pb-4 font-medium">Tickets</th>
+                  <th className="pb-4 font-medium">Amount</th>
                   <th className="pb-4 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {bookings.slice(0, 5).map((booking) => (
-                  <tr key={booking.id} className="group hover:bg-white/5 transition-colors">
-                    <td className="py-4 font-medium">{booking.user_name}</td>
-                    <td className="py-4 text-text-muted">{booking.event_name}</td>
-                    <td className="py-4">{booking.seat_number}</td>
+                {bookings.slice(0, 10).map((b) => (
+                  <tr key={b.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-4 font-mono text-xs">{b.reference}</td>
+                    <td className="py-4 font-medium">{b.user_name}</td>
+                    <td className="py-4 text-text-muted">{b.event_name}{b.tour_slot ? ` · ${b.tour_slot}` : ''}</td>
+                    <td className="py-4">{b.quantity}</td>
+                    <td className="py-4">{inr(b.total_price)}</td>
                     <td className="py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        booking.status === 'Confirmed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 
-                        booking.status === 'Pending' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' : 
-                        'bg-primary/10 text-primary border border-primary/20'
-                      }`}>
-                        {booking.status}
-                      </span>
+                        b.status === 'confirmed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}>{b.status}</span>
                     </td>
                   </tr>
                 ))}
                 {bookings.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-10 text-center text-text-muted italic">No recent bookings found</td>
-                  </tr>
+                  <tr><td colSpan={6} className="py-10 text-center text-text-muted italic">No bookings yet</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Upcoming Events List */}
         <div className="card">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold">Upcoming Events</h3>
-            <button className="text-primary text-sm font-bold hover:underline">Manage</button>
-          </div>
-          <div className="space-y-6">
-            {events.slice(0, 4).map((event) => (
-              <div key={event.id} className="flex gap-4 group cursor-pointer">
-                <div className="w-12 h-12 rounded-xl bg-card-border flex flex-col items-center justify-center text-center group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                  <span className="text-xs font-bold uppercase">{event.date.split(' ')[0]}</span>
-                  <span className="text-lg font-black leading-none">{event.date.split(' ')[1]}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold mb-1 group-hover:text-primary transition-colors">{event.name}</div>
-                  <div className="text-sm text-text-muted truncate w-48">{event.description}</div>
-                  <div className="mt-2 text-xs font-medium flex items-center gap-2">
-                    <span className="text-primary">●</span> {event.capacity} Capacity
-                  </div>
-                </div>
-              </div>
-            ))}
-            {events.length === 0 && (
-              <div className="py-10 text-center text-text-muted italic">No upcoming events</div>
-            )}
-          </div>
+          <h3 className="text-xl font-bold mb-6">Add an event</h3>
+          <form onSubmit={createEvent} className="flex flex-col gap-3">
+            <input className="input-field" placeholder="Event name" required minLength={3} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} aria-label="Event name" />
+            <input className="input-field" type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} aria-label="Date" />
+            <div className="grid grid-cols-2 gap-3">
+              <input className="input-field" type="number" min={1} required value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} aria-label="Capacity" placeholder="Capacity" />
+              <input className="input-field" type="number" min={0} required value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} aria-label="Price in INR" placeholder="Price ₹" />
+            </div>
+            <textarea className="input-field" rows={3} placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} aria-label="Description" />
+            <button className="btn-primary py-2 font-bold disabled:opacity-50" disabled={saving}>{saving ? 'Saving…' : 'Create event'}</button>
+          </form>
         </div>
       </div>
 
-      {/* Analytics Visualization Placeholder */}
-      <div className="card h-64 flex flex-col justify-center items-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none" />
-        <svg className="w-full h-32 text-primary/20" viewBox="0 0 100 20">
-          <path d="M0 10 Q 10 2, 20 12 T 40 8 T 60 15 T 80 5 T 100 12" fill="none" stroke="currentColor" strokeWidth="1" className="animate-pulse" />
-        </svg>
-        <div className="mt-4 text-center z-10">
-          <div className="text-2xl font-black italic">REVENUE GROWTH GRAPH</div>
-          <p className="text-text-muted">Real-time data visualization coming soon</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="card">
+          <h3 className="text-xl font-bold mb-6">Events ({events.length})</h3>
+          <div className="space-y-4">
+            {events.map((e) => (
+              <div key={e.id} className="flex justify-between gap-4 border-b border-white/5 pb-3">
+                <div>
+                  <div className="font-bold">{e.name}</div>
+                  <div className="text-sm text-text-muted">{e.is_tour ? 'Daily tour' : fmtDate(e.date)} · {inr(e.price)}</div>
+                </div>
+                <div className="text-sm text-text-muted whitespace-nowrap">{e.capacity.toLocaleString('en-IN')} {e.is_tour ? 'per slot' : 'capacity'}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card">
+          <h3 className="text-xl font-bold mb-6">Users ({users.length})</h3>
+          <div className="space-y-3">
+            {users.map((u) => (
+              <div key={u.id} className="flex justify-between gap-4 border-b border-white/5 pb-3 text-sm">
+                <span className="font-medium">{u.name}</span>
+                <span className="text-text-muted truncate">{u.email}</span>
+                <span className={u.role === 'admin' ? 'text-primary font-bold' : 'text-text-muted'}>{u.role}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
